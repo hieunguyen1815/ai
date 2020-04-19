@@ -217,40 +217,14 @@ class MinesweeperAI():
         # add a new sentence to the AI's knowledge base
         self.add_new_sentence(cell, count)
 
-        while True:
-            has_knowledge = False
-            # remove useless sentence
-            self.knowledge: List[Sentence] = [sentence for sentence in self.knowledge if len(sentence.cells) > 0]
-            # merge sentence
-            knowledge_copy = copy.deepcopy(self.knowledge)
-            for i, s1 in enumerate(knowledge_copy):
-                for j, s2 in enumerate(knowledge_copy):
-                    if i != j:
-                        self.simplify_sentence(s1, s2)
-                        self.reduce_sentence(s1, s2)
+        # remove useless sentence
+        self.knowledge: List[Sentence] = [sentence for sentence in self.knowledge if len(sentence.cells) > 0]
 
-            for sentence in self.knowledge:
-                # check known safes
-                known_safes = sentence.known_safes()
-                if known_safes:
-                    has_knowledge = True
-                    known_safes_copy = copy.deepcopy(known_safes)
-                    for safe in known_safes_copy:
-                        self.mark_safe(safe)
+        # find safes
+        self.find_safes()
 
-                # remove known cells in sentence
-                sentence.cells = [cell for cell in sentence.cells if cell not in self.moves_made and cell not in self.safes]
-
-                # check known mines
-                known_mines = sentence.known_mines()
-                if known_mines:
-                    known_mines_copy = copy.deepcopy(known_mines)
-                    for mine in known_mines_copy:
-                        self.mark_mine(mine)
-
-            # break if not found any more knowledge
-            if not has_knowledge:
-                break
+        # find_mines
+        self.find_mines()
 
     def make_safe_move(self):
         """
@@ -310,16 +284,13 @@ class MinesweeperAI():
 
         self.knowledge.append(new_sentence)
 
-    @classmethod
-    def simplify_sentence(cls, s1: Sentence, s2: Sentence):
-        if s1.can_simplify(s2):
-            for c1 in s1.cells:
-                s2.cells.remove(c1)
-            s2.count -= s1.count
+    def find_safes(self):
+        for sentence in self.knowledge:
+            known_safes = sentence.known_safes()
+            if known_safes:
+                known_safes_copy = copy.deepcopy(known_safes)
+                for safe in known_safes_copy:
+                    self.mark_safe(safe)
 
-    @classmethod
-    def reduce_sentence(cls, s1: Sentence, s2: Sentence):
-        if s1.can_reduce(s2):
-            for c1 in s1.cells:
-                if c1 in s2.cells:
-                    s2.cells.remove(c1)
+    def find_mines(self):
+        pass
