@@ -1,5 +1,7 @@
-import itertools
+import copy
 import random
+from random import randint
+from typing import List
 
 
 class Minesweeper():
@@ -105,27 +107,35 @@ class Sentence():
         """
         Returns the set of all cells in self.cells known to be mines.
         """
-        raise NotImplementedError
+        if self.count != 0 and len(self.cells) == self.count:
+            return self.cells
+
+        return None
 
     def known_safes(self):
         """
         Returns the set of all cells in self.cells known to be safe.
         """
-        raise NotImplementedError
+        if self.count == 0:
+            return self.cells
+
+        return None
 
     def mark_mine(self, cell):
         """
         Updates internal knowledge representation given the fact that
         a cell is known to be a mine.
         """
-        raise NotImplementedError
+        if cell in self.cells:
+            self.cells.remove(cell)
 
     def mark_safe(self, cell):
         """
         Updates internal knowledge representation given the fact that
         a cell is known to be safe.
         """
-        raise NotImplementedError
+        if cell in self.cells:
+            self.cells.remove(cell)
 
 
 class MinesweeperAI():
@@ -147,7 +157,7 @@ class MinesweeperAI():
         self.safes = set()
 
         # List of sentences about the game known to be true
-        self.knowledge = []
+        self.knowledge: List[Sentence] = []
 
     def mark_mine(self, cell):
         """
@@ -182,7 +192,38 @@ class MinesweeperAI():
             5) add any new sentences to the AI's knowledge base
                if they can be inferred from existing knowledge
         """
-        raise NotImplementedError
+        # mark the cell as a move that has been made
+        self.moves_made.add(cell)
+
+        # mark the cell as safe
+        self.mark_safe(cell)
+
+        # add a new sentence to the AI's knowledge base
+        self.add_sentence(cell, count)
+
+        while True:
+            has_knowledge = False
+            # remove useless sentence
+            self.knowledge: List[Sentence] = [sentence for sentence in self.knowledge if len(sentence.cells) > 0]
+
+            for sentence in self.knowledge:
+                # check known mines
+                known_mines = sentence.known_mines()
+                if known_mines:
+                    known_mines_copy = copy.deepcopy(known_mines)
+                    for cell in known_mines_copy:
+                        self.mark_mine(cell)
+
+                # check known safes
+                known_safes = sentence.known_safes()
+                if known_safes:
+                    has_knowledge = True
+                    known_safes_copy = copy.deepcopy(known_safes)
+                    for cell in known_safes_copy:
+                        self.mark_safe(cell)
+            # break if not found any more knowledge
+            if not has_knowledge:
+                break
 
     def make_safe_move(self):
         """
@@ -193,7 +234,11 @@ class MinesweeperAI():
         This function may use the knowledge in self.mines, self.safes
         and self.moves_made, but should not modify any of those values.
         """
-        raise NotImplementedError
+        for safe_move in self.safes:
+            if safe_move not in self.moves_made:
+                return safe_move
+
+        return None
 
     def make_random_move(self):
         """
@@ -202,4 +247,39 @@ class MinesweeperAI():
             1) have not already been chosen, and
             2) are not known to be mines
         """
-        raise NotImplementedError
+        total_known_cells = self.moves_made.union(self.safes).union(self.mines)
+        if len(total_known_cells) == self.width * self.height:
+            return None
+
+        while True:
+            x = randint(0, self.width - 1)
+            y = randint(0, self.height - 1)
+            if (x, y) not in total_known_cells:
+                return x, y
+
+    def add_sentence(self, safe, count):
+        row_idx = safe[0]
+        column_idx = safe[1]
+        cells = set()
+
+        # generate cells in sentence
+        for i in range(row_idx - 1, row_idx + 1 + 1):
+            for j in range(column_idx - 1, column_idx + 1 + 1):
+                if i < 0 or j < 0:
+                    continue
+                if i >= self.height or j >= self.width:
+                    continue
+                cell = (i, j)
+                cells.add(cell)
+
+        # new sentence
+        new_sentence = Sentence(cells, count)
+
+        # check if sentence is exist
+        for sentence in self.knowledge:
+            if new_sentence == sentence:
+                return
+
+        # add sentence
+        self.knowledge.append(new_sentence)
+
