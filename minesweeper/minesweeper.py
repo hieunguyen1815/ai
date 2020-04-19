@@ -94,6 +94,7 @@ class Sentence():
     """
 
     def __init__(self, cells, count):
+        self.from_cell = None
         self.cells = set(cells)
         self.count = count
 
@@ -136,6 +137,21 @@ class Sentence():
         """
         if cell in self.cells:
             self.cells.remove(cell)
+
+    def can_simplify(self, other) -> bool:
+        for c in self.cells:
+            if c not in other.cells:
+                return False
+        return True
+
+    def can_reduce(self, other) -> bool:
+        if self.count != 0:
+            return False
+
+        for c in self.cells:
+            if c in other.cells:
+                return True
+        return False
 
 
 class MinesweeperAI():
@@ -199,28 +215,39 @@ class MinesweeperAI():
         self.mark_safe(cell)
 
         # add a new sentence to the AI's knowledge base
-        self.add_sentence(cell, count)
+        self.add_new_sentence(cell, count)
 
         while True:
             has_knowledge = False
             # remove useless sentence
             self.knowledge: List[Sentence] = [sentence for sentence in self.knowledge if len(sentence.cells) > 0]
+            # merge sentence
+            knowledge_copy = copy.deepcopy(self.knowledge)
+            for i, s1 in enumerate(knowledge_copy):
+                for j, s2 in enumerate(knowledge_copy):
+                    if i != j:
+                        self.simplify_sentence(s1, s2)
+                        self.reduce_sentence(s1, s2)
 
             for sentence in self.knowledge:
-                # check known mines
-                known_mines = sentence.known_mines()
-                if known_mines:
-                    known_mines_copy = copy.deepcopy(known_mines)
-                    for cell in known_mines_copy:
-                        self.mark_mine(cell)
-
                 # check known safes
                 known_safes = sentence.known_safes()
                 if known_safes:
                     has_knowledge = True
                     known_safes_copy = copy.deepcopy(known_safes)
-                    for cell in known_safes_copy:
-                        self.mark_safe(cell)
+                    for safe in known_safes_copy:
+                        self.mark_safe(safe)
+
+                # remove known cells in sentence
+                sentence.cells = [cell for cell in sentence.cells if cell not in self.moves_made and cell not in self.safes]
+
+                # check known mines
+                known_mines = sentence.known_mines()
+                if known_mines:
+                    known_mines_copy = copy.deepcopy(known_mines)
+                    for mine in known_mines_copy:
+                        self.mark_mine(mine)
+
             # break if not found any more knowledge
             if not has_knowledge:
                 break
@@ -234,9 +261,9 @@ class MinesweeperAI():
         This function may use the knowledge in self.mines, self.safes
         and self.moves_made, but should not modify any of those values.
         """
-        for safe_move in self.safes:
-            if safe_move not in self.moves_made:
-                return safe_move
+        safe_moves = [move for move in self.safes if move not in self.moves_made]
+        if len(safe_moves) > 0:
+            return safe_moves[0]
 
         return None
 
@@ -247,7 +274,7 @@ class MinesweeperAI():
             1) have not already been chosen, and
             2) are not known to be mines
         """
-        total_known_cells = self.moves_made.union(self.safes).union(self.mines)
+        total_known_cells = self.moves_made.union(self.mines)
         if len(total_known_cells) == self.width * self.height:
             return None
 
@@ -257,7 +284,7 @@ class MinesweeperAI():
             if (x, y) not in total_known_cells:
                 return x, y
 
-    def add_sentence(self, safe, count):
+    def add_new_sentence(self, safe, count):
         row_idx = safe[0]
         column_idx = safe[1]
         cells = set()
@@ -265,21 +292,34 @@ class MinesweeperAI():
         # generate cells in sentence
         for i in range(row_idx - 1, row_idx + 1 + 1):
             for j in range(column_idx - 1, column_idx + 1 + 1):
-                if i < 0 or j < 0:
-                    continue
-                if i >= self.height or j >= self.width:
+                if i < 0 or j < 0 or i >= self.height or j >= self.width:
                     continue
                 cell = (i, j)
+                if cells in self.moves_made or cell in self.safes:
+                    continue
                 cells.add(cell)
 
         # new sentence
         new_sentence = Sentence(cells, count)
+        new_sentence.from_cell = safe
 
         # check if sentence is exist
         for sentence in self.knowledge:
             if new_sentence == sentence:
                 return
 
-        # add sentence
         self.knowledge.append(new_sentence)
 
+    @classmethod
+    def simplify_sentence(cls, s1: Sentence, s2: Sentence):
+        if s1.can_simplify(s2):
+            for c1 in s1.cells:
+                s2.cells.remove(c1)
+            s2.count -= s1.count
+
+    @classmethod
+    def reduce_sentence(cls, s1: Sentence, s2: Sentence):
+        if s1.can_reduce(s2):
+            for c1 in s1.cells:
+                if c1 in s2.cells:
+                    s2.cells.remove(c1)
