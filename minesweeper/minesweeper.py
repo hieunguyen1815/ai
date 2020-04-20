@@ -129,6 +129,7 @@ class Sentence():
         """
         if cell in self.cells:
             self.cells.remove(cell)
+            self.count -= 1
 
     def mark_safe(self, cell):
         """
@@ -137,21 +138,6 @@ class Sentence():
         """
         if cell in self.cells:
             self.cells.remove(cell)
-
-    def can_simplify(self, other) -> bool:
-        for c in self.cells:
-            if c not in other.cells:
-                return False
-        return True
-
-    def can_reduce(self, other) -> bool:
-        if self.count != 0:
-            return False
-
-        for c in self.cells:
-            if c in other.cells:
-                return True
-        return False
 
 
 class MinesweeperAI():
@@ -162,8 +148,8 @@ class MinesweeperAI():
     def __init__(self, height=8, width=8):
 
         # Set initial height and width
-        self.height = height
-        self.width = width
+        self.height: int = height
+        self.width: int = width
 
         # Keep track of which cells have been clicked on
         self.moves_made = set()
@@ -293,4 +279,11 @@ class MinesweeperAI():
                     self.mark_safe(safe)
 
     def find_mines(self):
-        pass
+        # mark mines
+        for sentence in self.knowledge:
+            known_mines = sentence.known_mines()
+            if known_mines:
+                known_mines_copy = copy.deepcopy(known_mines)
+                for mine in known_mines_copy:
+                    self.mark_mine(mine)
+        # simplify sentence
